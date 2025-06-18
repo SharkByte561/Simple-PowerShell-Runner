@@ -13,8 +13,8 @@ jobs:
     # Only run if the issue has the 'execute-powershell' label
     if: contains(github.event.issue.labels.*.name, 'execute-powershell')
     
-    # Use GitHub-hosted Windows runner
-    runs-on: windows-latest
+    # Use your self-hosted Windows runner
+    runs-on: [self-hosted, windows]
     
     steps:
       - name: Parse PowerShell Command from Issue
@@ -72,13 +72,16 @@ jobs:
           Write-Host "Description: ${{ steps.parse.outputs.description }}" -ForegroundColor Cyan
           Write-Host "Command to execute:" -ForegroundColor Magenta
           Write-Host "${{ steps.parse.outputs.command }}" -ForegroundColor White
+          Write-Host "Local Machine: $env:COMPUTERNAME" -ForegroundColor Red
+          Write-Host "Current User: $env:USERNAME" -ForegroundColor Red
           Write-Host "=================================================" -ForegroundColor Green
       
       - name: Execute PowerShell Command
         id: execute
         shell: powershell
         run: |
-          Write-Host "? Executing PowerShell command..." -ForegroundColor Green
+          Write-Host "? Executing PowerShell command on LOCAL MACHINE..." -ForegroundColor Green
+          Write-Host "??  WARNING: This will run on $env:COMPUTERNAME as $env:USERNAME" -ForegroundColor Red
           
           $command = @"
           ${{ steps.parse.outputs.command }}
@@ -89,7 +92,7 @@ jobs:
             $output = Invoke-Expression $command 2>&1 | Out-String
             $exitCode = $LASTEXITCODE
             
-            Write-Host "? Command executed successfully!" -ForegroundColor Green
+            Write-Host "? Command executed successfully on LOCAL MACHINE!" -ForegroundColor Green
             Write-Host "Output:" -ForegroundColor Yellow
             Write-Host $output
             
@@ -108,7 +111,7 @@ jobs:
             $env:COMMAND_EXIT_CODE = if ($exitCode) { $exitCode } else { "0" }
           }
           catch {
-            Write-Host "? Command execution failed!" -ForegroundColor Red
+            Write-Host "? Command execution failed on LOCAL MACHINE!" -ForegroundColor Red
             Write-Host "Error: $_" -ForegroundColor Red
             
             $env:COMMAND_OUTPUT = "Error: $_"
@@ -138,10 +141,11 @@ jobs:
             const timestamp = new Date().toISOString();
             const runUrl = `${context.payload.repository.html_url}/actions/runs/${context.runId}`;
             
-            let comment = `## ?? PowerShell Command Execution Results\n\n`;
+            let comment = `## ?? PowerShell Command Execution Results (LOCAL MACHINE)\n\n`;
             comment += `**Timestamp:** ${timestamp}\n`;
             comment += `**Status:** ${success ? '? Success' : '? Failed'}\n`;
             comment += `**Exit Code:** ${exitCode}\n`;
+            comment += `**Executed On:** Self-hosted runner (your local machine)\n`;
             comment += `**Build URL:** [View Full Logs](${runUrl})\n\n`;
             
             comment += `### Command Executed\n`;
@@ -160,9 +164,9 @@ jobs:
             }
             
             if (success) {
-              comment += `### ? Command completed successfully!\n`;
+              comment += `### ? Command completed successfully on your local machine!\n`;
             } else {
-              comment += `### ? Command execution failed\n`;
+              comment += `### ? Command execution failed on your local machine\n`;
               comment += `Check the [workflow logs](${runUrl}) for more details.\n`;
             }
             
