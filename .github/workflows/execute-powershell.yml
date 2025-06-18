@@ -1,0 +1,168 @@
+name: Execute PowerShell Command
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  execute-powershell:
+    # Only run if the issue has the 'execute-powershell' label
+    if: contains(github.event.issue.labels.*.name, 'execute-powershell')
+    
+    # Use your self-hosted runner (change to 'windows-latest' for GitHub-hosted)
+    runs-on: [self-hosted, windows]
+    
+    steps:
+      - name: Parse PowerShell Command from Issue
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body;
+            
+            console.log('Issue body:', body);
+            
+            // Extract PowerShell command using regex
+            const commandMatch = body.match(/### PowerShell Command\s*\n\s*([\s\S]*?)(?=\n###|\n\n|$)/i);
+            const descriptionMatch = body.match(/### Description \(Optional\)\s*\n\s*([\s\S]*?)(?=\n###|\n\n|$)/i);
+            
+            const command = commandMatch ? commandMatch[1].trim() : '';
+            const description = descriptionMatch ? descriptionMatch[1].trim() : 'No description provided';
+            
+            console.log('Extracted command:', command);
+            console.log('Description:', description);
+            
+            // Validate command is not empty
+            if (!command) {
+              throw new Error('No PowerShell command found in issue body');
+            }
+            
+            // Basic safety check - reject obviously dangerous commands
+            const dangerousPatterns = [
+              /rm\s+-rf/i,
+              /del\s+\/s/i,
+              /format\s+c:/i,
+              /shutdown/i,
+              /restart-computer/i,
+              /remove-item.*-recurse.*-force/i
+            ];
+            
+            const isDangerous = dangerousPatterns.some(pattern => pattern.test(command));
+            if (isDangerous) {
+              throw new Error('Command appears to be potentially dangerous and has been blocked');
+            }
+            
+            core.setOutput('command', command);
+            core.setOutput('description', description);
+            
+            return { command, description };
+      
+      - name: Display Command Info
+        shell: pwsh
+        run: |
+          Write-Host "=== PowerShell Command Execution ===" -ForegroundColor Green
+          Write-Host "Issue: #${{ github.event.issue.number }}" -ForegroundColor Yellow
+          Write-Host "Title: ${{ github.event.issue.title }}" -ForegroundColor Yellow
+          Write-Host "Author: ${{ github.event.issue.user.login }}" -ForegroundColor Yellow
+          Write-Host "Description: ${{ steps.parse.outputs.description }}" -ForegroundColor Cyan
+          Write-Host "Command to execute:" -ForegroundColor Magenta
+          Write-Host "${{ steps.parse.outputs.command }}" -ForegroundColor White
+          Write-Host "===========================================" -ForegroundColor Green
+      
+      - name: Execute PowerShell Command
+        id: execute
+        shell: pwsh
+        run: |
+          Write-Host "🚀 Executing PowerShell command..." -ForegroundColor Green
+          
+          $command = @"
+          ${{ steps.parse.outputs.command }}
+          "@
+          
+          try {
+            # Capture both output and errors
+            $output = Invoke-Expression $command 2>&1 | Out-String
+            $exitCode = $LASTEXITCODE
+            
+            Write-Host "✅ Command executed successfully!" -ForegroundColor Green
+            Write-Host "Output:" -ForegroundColor Yellow
+            Write-Host $output
+            
+            # Set outputs for the next step
+            $env:COMMAND_OUTPUT = $output
+            $env:COMMAND_SUCCESS = "true"
+            $env:COMMAND_EXIT_CODE = $exitCode
+          }
+          catch {
+            Write-Host "❌ Command execution failed!" -ForegroundColor Red
+            Write-Host "Error: $_" -ForegroundColor Red
+            
+            $env:COMMAND_OUTPUT = "Error: $_"
+            $env:COMMAND_SUCCESS = "false"
+            $env:COMMAND_EXIT_CODE = "1"
+          }
+      
+      - name: Update Issue with Results
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          script: |
+            const success = process.env.COMMAND_SUCCESS === 'true';
+            const output = process.env.COMMAND_OUTPUT || 'No output captured';
+            const exitCode = process.env.COMMAND_EXIT_CODE || 'Unknown';
+            const command = '${{ steps.parse.outputs.command }}';
+            const description = '${{ steps.parse.outputs.description }}';
+            
+            const timestamp = new Date().toISOString();
+            const runUrl = `${context.payload.repository.html_url}/actions/runs/${context.runId}`;
+            
+            let comment = `## 🔧 PowerShell Command Execution Results\n\n`;
+            comment += `**Timestamp:** ${timestamp}\n`;
+            comment += `**Status:** ${success ? '✅ Success' : '❌ Failed'}\n`;
+            comment += `**Exit Code:** ${exitCode}\n`;
+            comment += `**Build URL:** [View Full Logs](${runUrl})\n\n`;
+            
+            comment += `### Command Executed\n`;
+            comment += `\`\`\`powershell\n${command}\n\`\`\`\n\n`;
+            
+            if (description && description !== 'No description provided') {
+              comment += `### Description\n${description}\n\n`;
+            }
+            
+            comment += `### Output\n`;
+            comment += `\`\`\`\n${output}\n\`\`\`\n\n`;
+            
+            if (success) {
+              comment += `### ✅ Command completed successfully!\n`;
+            } else {
+              comment += `### ❌ Command execution failed\n`;
+              comment += `Check the [workflow logs](${runUrl}) for more details.\n`;
+            }
+            
+            // Post the comment
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+            
+            // Add appropriate labels
+            const labelToAdd = success ? 'executed-successfully' : 'execution-failed';
+            await github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: [labelToAdd]
+            });
+            
+            // Close the issue if successful (optional)
+            if (success) {
+              await github.rest.issues.update({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'closed'
+              });
+            }

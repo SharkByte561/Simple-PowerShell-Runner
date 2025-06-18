@@ -1,0 +1,42 @@
+name: Execute PowerShell Command
+description: Submit a PowerShell command to be executed by the GitHub runner
+title: "[POWERSHELL] "
+labels: ["execute-powershell"]
+assignees: ["SharkByte561"]
+body:
+  - type: textarea
+    id: powershell-command
+    attributes:
+      label: PowerShell Command
+      description: Enter the PowerShell command you want to execute
+      placeholder: |
+        Example: Get-Process | Where-Object { $_.CPU -gt 100 } | Select-Object Name, CPU
+        
+        Or: Write-Host "Hello World!" -ForegroundColor Green
+        
+        Or: Get-ComputerInfo | Select-Object WindowsVersion, TotalPhysicalMemory
+      value: ""
+    validations:
+      required: true
+  
+  - type: textarea
+    id: description
+    attributes:
+      label: Description (Optional)
+      description: Briefly describe what this command does
+      placeholder: This command will check system processes with high CPU usage...
+    validations:
+      required: false
+  
+  - type: checkboxes
+    id: safety-check
+    attributes:
+      label: Safety Confirmation
+      description: Please confirm you understand the command will be executed
+      options:
+        - label: I understand this command will be executed on the GitHub runner
+          required: true
+        - label: This command is safe and does not contain malicious code
+          required: true
+        - label: I have tested this command locally (recommended)
+          required: false
