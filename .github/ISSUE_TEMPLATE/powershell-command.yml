@@ -15,7 +15,6 @@ body:
         Or: Write-Host "Hello World!" -ForegroundColor Green
         
         Or: Get-ComputerInfo | Select-Object WindowsVersion, TotalPhysicalMemory
-      value: ""
     validations:
       required: true
   
