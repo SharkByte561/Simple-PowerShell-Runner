@@ -3,7 +3,7 @@
 
 param(
     [Parameter(Mandatory=$true)]
-    [string]$GitHubToken = "BCT67H5NKV3DNHGJXOWZXVTIKML32",
+    [string]$GitHubToken = "",
     
     [Parameter(Mandatory=$false)]
     [string]$RepoUrl = "https://github.com/SharkByte561/Simple-PowerShell-Runner",
