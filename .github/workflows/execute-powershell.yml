@@ -9,8 +9,8 @@ jobs:
     # Only run if the issue has the 'execute-powershell' label
     if: contains(github.event.issue.labels.*.name, 'execute-powershell')
     
-    # Use your self-hosted runner (change to 'windows-latest' for GitHub-hosted)
-    runs-on: [self-hosted, windows]
+    # Use GitHub-hosted Windows runner instead of self-hosted
+    runs-on: windows-latest
     
     steps:
       - name: Parse PowerShell Command from Issue
@@ -68,13 +68,13 @@ jobs:
           Write-Host "Description: ${{ steps.parse.outputs.description }}" -ForegroundColor Cyan
           Write-Host "Command to execute:" -ForegroundColor Magenta
           Write-Host "${{ steps.parse.outputs.command }}" -ForegroundColor White
-          Write-Host "===========================================" -ForegroundColor Green
+          Write-Host "=================================================" -ForegroundColor Green
       
       - name: Execute PowerShell Command
         id: execute
         shell: pwsh
         run: |
-          Write-Host "🚀 Executing PowerShell command..." -ForegroundColor Green
+          Write-Host "? Executing PowerShell command..." -ForegroundColor Green
           
           $command = @"
           ${{ steps.parse.outputs.command }}
@@ -85,7 +85,7 @@ jobs:
             $output = Invoke-Expression $command 2>&1 | Out-String
             $exitCode = $LASTEXITCODE
             
-            Write-Host "✅ Command executed successfully!" -ForegroundColor Green
+            Write-Host "? Command executed successfully!" -ForegroundColor Green
             Write-Host "Output:" -ForegroundColor Yellow
             Write-Host $output
             
@@ -95,7 +95,7 @@ jobs:
             $env:COMMAND_EXIT_CODE = $exitCode
           }
           catch {
-            Write-Host "❌ Command execution failed!" -ForegroundColor Red
+            Write-Host "? Command execution failed!" -ForegroundColor Red
             Write-Host "Error: $_" -ForegroundColor Red
             
             $env:COMMAND_OUTPUT = "Error: $_"
@@ -117,9 +117,9 @@ jobs:
             const timestamp = new Date().toISOString();
             const runUrl = `${context.payload.repository.html_url}/actions/runs/${context.runId}`;
             
-            let comment = `## 🔧 PowerShell Command Execution Results\n\n`;
+            let comment = `## ?? PowerShell Command Execution Results\n\n`;
             comment += `**Timestamp:** ${timestamp}\n`;
-            comment += `**Status:** ${success ? '✅ Success' : '❌ Failed'}\n`;
+            comment += `**Status:** ${success ? '? Success' : '? Failed'}\n`;
             comment += `**Exit Code:** ${exitCode}\n`;
             comment += `**Build URL:** [View Full Logs](${runUrl})\n\n`;
             
@@ -134,9 +134,9 @@ jobs:
             comment += `\`\`\`\n${output}\n\`\`\`\n\n`;
             
             if (success) {
-              comment += `### ✅ Command completed successfully!\n`;
+              comment += `### ? Command completed successfully!\n`;
             } else {
-              comment += `### ❌ Command execution failed\n`;
+              comment += `### ? Command execution failed\n`;
               comment += `Check the [workflow logs](${runUrl}) for more details.\n`;
             }
             
