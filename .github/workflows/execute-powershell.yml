@@ -4,12 +4,16 @@ on:
   issues:
     types: [opened, labeled]
 
+permissions:
+  issues: write
+  contents: read
+
 jobs:
   execute-powershell:
     # Only run if the issue has the 'execute-powershell' label
     if: contains(github.event.issue.labels.*.name, 'execute-powershell')
     
-    # Use GitHub-hosted Windows runner instead of self-hosted
+    # Use GitHub-hosted Windows runner
     runs-on: windows-latest
     
     steps:
@@ -59,7 +63,7 @@ jobs:
             return { command, description };
       
       - name: Display Command Info
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "=== PowerShell Command Execution ===" -ForegroundColor Green
           Write-Host "Issue: #${{ github.event.issue.number }}" -ForegroundColor Yellow
@@ -72,7 +76,7 @@ jobs:
       
       - name: Execute PowerShell Command
         id: execute
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "? Executing PowerShell command..." -ForegroundColor Green
           
